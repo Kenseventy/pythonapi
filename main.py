@@ -1,8 +1,10 @@
 from enum import Enum
 from importlib.resources import path
+import string
+from unicodedata import name
 from starlette.requests import Request
 from starlette.responses import Response
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Form
 from azure.cosmos import exceptions, CosmosClient, PartitionKey
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
@@ -10,6 +12,7 @@ import config
 import json
 import os
 from datetime import date
+from fastapi.templating import Jinja2Templates
 
 
 
@@ -22,6 +25,7 @@ container = database.get_container_client(config.container_name)
 path = 'C:/Users/Kenseventy/Git/apicounter/'
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates/")
 
 class Guest(BaseModel):
     name: str
@@ -43,6 +47,9 @@ async def root(request: Request):
     file_path = os.path.join(path, "resume.json")
     return FileResponse(file_path)
 
+
+
+
 @app.post("/guestbook")
 async def create_item(item: Guest):
     test = container.query_items(query="SELECT VALUE COUNT(1) FROM c", enable_cross_partition_query=True)
@@ -56,3 +63,14 @@ async def create_item(item: Guest):
     post = container.create_item(body=data)
     thank = "Thank you for your message " + item.name
     return thank
+
+@app.get("/form")
+def form_post(request: Request):
+    item = container.query_items(query="SELECT * FROM c WHERE IS_DEFINED(c.name)", enable_cross_partition_query=True)
+    result = print(item)
+    return templates.TemplateResponse('form.html', context={'request': request, 'result': result})
+
+@app.post("/form")
+def form_post(request: Request, name: str = Form(...)):
+    result = name
+    return templates.TemplateResponse('form.html', context={'request': request, 'result': result})
